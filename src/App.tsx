@@ -151,7 +151,7 @@ export default function App() {
               ))}
               {/* TOTAL ROW */}
               <tr className="bg-slate-900 text-white">
-                <td className="p-8 px-6 text-[10px] font-black uppercase tracking-[0.3em]">Estimated Total</td>
+                <td className="p-8 px-6 text-[10px] font-black uppercase tracking-[0.3em]">Estimated Totals</td>
                 {locations.map(loc => (
                   <td key={loc.id} className="p-8 px-6">
                     <div className="text-3xl font-black tracking-tighter">

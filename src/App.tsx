@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, onSnapshot, setDoc } from "firebase/firestore";
 
@@ -19,6 +19,12 @@ const db = getFirestore(app);
 const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>;
 const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6"/></svg>;
 
+interface Row {
+  id: string;
+  label: string;
+  costs: Record<number, number>; // Fixed TypeScript indexing issue
+}
+
 export default function App() {
   const [locations, setLocations] = useState([
     { id: 1, name: "Maui" },
@@ -27,12 +33,11 @@ export default function App() {
     { id: 4, name: "London" }
   ]);
 
-  const [rows, setRows] = useState([
+  const [rows, setRows] = useState<Row[]>([
     { id: '1', label: 'Flights', costs: { 1: 0, 2: 0, 3: 0, 4: 0 } },
     { id: '2', label: 'Hotel', costs: { 1: 0, 2: 0, 3: 0, 4: 0 } }
   ]);
 
-  // Sync from Firebase
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "budgets", "spreadsheet-data"), (snapshot) => {
       if (snapshot.exists()) {
@@ -91,7 +96,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-white p-4 md:p-12 font-sans text-slate-900">
+    <div className="min-h-screen bg-white p-4 md:p-12 text-slate-900">
       <div className="max-w-[1400px] mx-auto">
         <header className="mb-12">
           <h1 className="text-4xl font-black tracking-tight mb-2">Vacation Budget Pro</h1>
@@ -102,7 +107,7 @@ export default function App() {
           <table className="w-full border-collapse bg-white text-left">
             <thead>
               <tr className="bg-slate-50/50">
-                <th className="p-6 border-b border-slate-100 w-64 text-[10px] font-black uppercase tracking-widest text-slate-400">Expense Category</th>
+                <th className="p-6 border-b border-slate-100 w-64 text-[10px] font-black uppercase tracking-widest text-slate-400">Category</th>
                 {locations.map(loc => (
                   <th key={loc.id} className="p-6 border-b border-slate-100 min-w-[200px]">
                     <input 
@@ -132,7 +137,7 @@ export default function App() {
                         <span className="absolute left-0 text-slate-300 font-bold">$</span>
                         <input 
                           type="number"
-                          className="w-full bg-transparent pl-4 outline-none font-mono font-bold text-slate-800"
+                          className="w-full bg-transparent pl-4 outline-none font-bold text-slate-800"
                           value={row.costs[loc.id] || ''}
                           onChange={(e) => updateCost(row.id, loc.id, e.target.value)}
                         />
@@ -149,9 +154,8 @@ export default function App() {
                   </td>
                 </tr>
               ))}
-              {/* TOTAL ROW */}
               <tr className="bg-slate-900 text-white">
-                <td className="p-8 px-6 text-[10px] font-black uppercase tracking-[0.3em]">Estimated Total</td>
+                <td className="p-8 px-6 text-[10px] font-black uppercase tracking-[0.3em]">Total</td>
                 {locations.map(loc => (
                   <td key={loc.id} className="p-8 px-6">
                     <div className="text-3xl font-black tracking-tighter">

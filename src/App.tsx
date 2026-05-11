@@ -66,8 +66,8 @@ export default function App() {
     if (locations.length <= 1) return;
     const l = locations.filter(loc => loc.id !== id);
     const r = rows.map(row => {
-        const c = { ...row.costs }; delete c[id];
-        return { ...row, costs: c };
+      const c = { ...row.costs }; delete c[id];
+      return { ...row, costs: c };
     });
     setLocations(l); setRows(r); save(l, r);
   };
@@ -89,27 +89,81 @@ export default function App() {
     <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-[1400px] mx-auto">
         
-        <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+        {/* SHARED HEADER */}
+        <header className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
           <div>
             <h1 className="text-2xl font-black tracking-tight text-slate-800">Vacation Planner Pro</h1>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Cloud Sync Active</p>
-            </div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1 italic">Real-time Cloud Sync</p>
           </div>
           
           <div className="flex flex-wrap gap-2">
-            <select className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold shadow-sm outline-none" onChange={(e) => setCurrency(e.target.value)}>
+            <select className="flex-1 md:flex-none bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold shadow-sm outline-none" onChange={(e) => setCurrency(e.target.value)}>
               <option value="$">USD ($)</option>
               <option value="€">EUR (€)</option>
               <option value="£">GBP (£)</option>
             </select>
-            <button onClick={exportCSV} className="flex items-center gap-2 bg-white border border-slate-200 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 shadow-sm transition-all"><IconDownload /> Export</button>
-            <button onClick={addCol} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 shadow-md transition-all"><IconPlus /> Add Destination</button>
+            <button onClick={exportCSV} className="hidden md:flex items-center gap-2 bg-white border border-slate-200 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 shadow-sm transition-all"><IconDownload /> Export</button>
+            <button onClick={addCol} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 shadow-md transition-all"><IconPlus /> Add Destination</button>
           </div>
         </header>
 
-        <div className="bg-white rounded-xl shadow-xl shadow-slate-200/60 border border-slate-200 overflow-hidden">
+        {/* --- MOBILE STACKED VIEW --- */}
+        <div className="block md:hidden space-y-6">
+          {locations.map(loc => (
+            <div key={loc.id} className="bg-white rounded-2xl p-5 shadow-lg border border-slate-100 relative">
+              <button onClick={() => deleteCol(loc.id)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500"><IconTrash /></button>
+              <input 
+                className="w-full bg-transparent font-black text-xl mb-4 outline-none text-blue-600 pr-10" 
+                value={loc.name} 
+                onChange={(e) => {
+                  const next = locations.map(l => l.id === loc.id ? {...l, name: e.target.value} : l);
+                  setLocations(next); save(next, rows);
+                }} 
+              />
+              <div className="space-y-3">
+                {rows.map(row => (
+                  <div key={row.id} className="flex items-center justify-between gap-4 border-b border-slate-50 pb-2 group">
+                    <div className="flex-1">
+                      <input 
+                        className="w-full bg-transparent text-[10px] font-black uppercase text-slate-400 outline-none"
+                        value={row.label}
+                        placeholder="Item..."
+                        onChange={(e) => {
+                          const next = rows.map(r => r.id === row.id ? {...r, label: e.target.value} : r);
+                          setRows(next); save(locations, next);
+                        }}
+                      />
+                      <div className="flex items-center font-bold text-lg">
+                        <span className="text-slate-300 mr-1 text-sm">{currency}</span>
+                        <input 
+                          type="number" 
+                          className="w-full bg-transparent outline-none"
+                          value={row.costs[loc.id] === 0 ? 0 : row.costs[loc.id] || ''}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                            const next = rows.map(r => r.id === row.id ? {...r, costs: {...r.costs, [loc.id]: val}} : r);
+                            setRows(next); save(locations, next);
+                          }} 
+                        />
+                      </div>
+                    </div>
+                    <button onClick={() => deleteRow(row.id)} className="text-slate-200 hover:text-red-500"><IconTrash /></button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 pt-4 border-t-2 border-dashed border-slate-100 flex justify-between items-end">
+                <span className="text-[10px] font-black uppercase text-slate-400">Total Est.</span>
+                <p className="text-3xl font-black tracking-tighter">
+                  {currency}{rows.reduce((sum, r) => sum + (r.costs[loc.id] || 0), 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* --- DESKTOP SPREADSHEET VIEW --- */}
+        <div className="hidden md:block bg-white rounded-xl shadow-xl shadow-slate-200/60 border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left table-fixed min-w-[900px]">
               <thead>
@@ -126,7 +180,7 @@ export default function App() {
                       </div>
                     </th>
                   ))}
-                  <th className="w-12 p-4 border-b border-l border-slate-200"></th> {/* Action Column Header */}
+                  <th className="w-12 p-4 border-b border-l border-slate-200"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -153,7 +207,6 @@ export default function App() {
                         </div>
                       </td>
                     ))}
-                    {/* The "Missing" Delete Row Button */}
                     <td className="p-3 border-l border-slate-100 text-center">
                       <button onClick={() => deleteRow(row.id)} className="opacity-0 group-hover:opacity-100 text-slate-200 hover:text-red-500 transition-all">
                         <IconTrash />
@@ -177,7 +230,7 @@ export default function App() {
           </div>
         </div>
 
-        <button onClick={addRow} className="mt-6 flex items-center gap-2 bg-slate-200/50 text-slate-600 font-bold text-xs px-6 py-3 rounded-xl hover:bg-slate-200 transition-all shadow-sm">
+        <button onClick={addRow} className="mt-6 flex items-center justify-center gap-2 bg-white md:bg-slate-200/50 text-slate-600 font-bold text-xs px-6 py-4 md:py-3 rounded-xl hover:bg-slate-200 transition-all w-full md:w-auto shadow-sm">
           <IconPlus /> Add Row Item
         </button>
       </div>

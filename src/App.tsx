@@ -18,7 +18,6 @@ const db = getFirestore(app);
 // --- Icons ---
 const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>;
 const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6"/></svg>;
-const IconDownload = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>;
 const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>;
 
 interface Row {
@@ -33,7 +32,6 @@ export default function App() {
     { id: '1', label: 'Flights', costs: { 1: 0, 2: 0 } },
     { id: '2', label: 'Hotel', costs: { 1: 0, 2: 0 } }
   ]);
-  const [currency, setCurrency] = useState('$');
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "budgets", "spreadsheet-data"), (snapshot) => {
@@ -77,34 +75,19 @@ export default function App() {
     setRows(r); save(locations, r);
   };
 
-  const exportCSV = () => {
-    const headers = ["Category", ...locations.map(l => l.name)].join(",");
-    const data = rows.map(r => [r.label, ...locations.map(l => r.costs[l.id])].join(",")).join("\n");
-    const blob = new Blob([[headers, data].join("\n")], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'budget.csv'; a.click();
-  };
-
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-[1400px] mx-auto">
         
-        {/* SHARED HEADER */}
         <header className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
           <div>
             <h1 className="text-2xl font-black tracking-tight text-slate-800">Vacation Planner Pro</h1>
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-1 italic">Real-time Cloud Sync</p>
           </div>
           
-          <div className="flex flex-wrap gap-2">
-            <select className="flex-1 md:flex-none bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold shadow-sm outline-none" onChange={(e) => setCurrency(e.target.value)}>
-              <option value="$">USD ($)</option>
-              <option value="€">EUR (€)</option>
-              <option value="£">GBP (£)</option>
-            </select>
-            <button onClick={exportCSV} className="hidden md:flex items-center gap-2 bg-white border border-slate-200 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 shadow-sm transition-all"><IconDownload /> Export</button>
-            <button onClick={addCol} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 shadow-md transition-all"><IconPlus /> Add Destination</button>
-          </div>
+          <button onClick={addCol} className="md:w-auto flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg text-xs font-bold hover:bg-blue-700 shadow-md transition-all">
+            <IconPlus /> Add Destination
+          </button>
         </header>
 
         {/* --- MOBILE STACKED VIEW --- */}
@@ -124,17 +107,20 @@ export default function App() {
                 {rows.map(row => (
                   <div key={row.id} className="flex items-center justify-between gap-4 border-b border-slate-50 pb-2 group">
                     <div className="flex-1">
-                      <input 
-                        className="w-full bg-transparent text-[10px] font-black uppercase text-slate-400 outline-none"
-                        value={row.label}
-                        placeholder="Item..."
-                        onChange={(e) => {
-                          const next = rows.map(r => r.id === row.id ? {...r, label: e.target.value} : r);
-                          setRows(next); save(locations, next);
-                        }}
-                      />
-                      <div className="flex items-center font-bold text-lg">
-                        <span className="text-slate-300 mr-1 text-sm">{currency}</span>
+                      <div className="flex items-center gap-2">
+                        <input 
+                          className="flex-1 bg-transparent text-[10px] font-black uppercase text-slate-400 outline-none"
+                          value={row.label}
+                          placeholder="Item..."
+                          onChange={(e) => {
+                            const next = rows.map(r => r.id === row.id ? {...r, label: e.target.value} : r);
+                            setRows(next); save(locations, next);
+                          }}
+                        />
+                        <button onClick={() => deleteRow(row.id)} className="text-slate-200 hover:text-red-500"><IconTrash /></button>
+                      </div>
+                      <div className="flex items-center font-bold text-lg mt-1">
+                        <span className="text-slate-300 mr-1 text-sm">$</span>
                         <input 
                           type="number" 
                           className="w-full bg-transparent outline-none"
@@ -148,14 +134,13 @@ export default function App() {
                         />
                       </div>
                     </div>
-                    <button onClick={() => deleteRow(row.id)} className="text-slate-200 hover:text-red-500"><IconTrash /></button>
                   </div>
                 ))}
               </div>
               <div className="mt-4 pt-4 border-t-2 border-dashed border-slate-100 flex justify-between items-end">
                 <span className="text-[10px] font-black uppercase text-slate-400">Total Est.</span>
                 <p className="text-3xl font-black tracking-tighter">
-                  {currency}{rows.reduce((sum, r) => sum + (r.costs[loc.id] || 0), 0).toLocaleString()}
+                  ${rows.reduce((sum, r) => sum + (r.costs[loc.id] || 0), 0).toLocaleString()}
                 </p>
               </div>
             </div>
@@ -165,10 +150,10 @@ export default function App() {
         {/* --- DESKTOP SPREADSHEET VIEW --- */}
         <div className="hidden md:block bg-white rounded-xl shadow-xl shadow-slate-200/60 border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left table-fixed min-w-[900px]">
+            <table className="w-full border-collapse text-left table-fixed min-w-[800px]">
               <thead>
                 <tr className="bg-slate-50">
-                  <th className="w-48 p-4 border-b border-slate-200 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Category</th>
+                  <th className="w-56 p-4 border-b border-slate-200 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Expense Category</th>
                   {locations.map(loc => (
                     <th key={loc.id} className="p-4 border-b border-l border-slate-200 group relative">
                       <div className="flex items-center justify-between">
@@ -180,13 +165,15 @@ export default function App() {
                       </div>
                     </th>
                   ))}
-                  <th className="w-12 p-4 border-b border-l border-slate-200"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {rows.map(row => (
                   <tr key={row.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="p-3 px-4 bg-slate-50/30">
+                    <td className="p-3 px-4 bg-slate-50/30 flex items-center gap-2">
+                      <button onClick={() => deleteRow(row.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all shrink-0">
+                        <IconTrash />
+                      </button>
                       <input placeholder="Item..." className="w-full bg-transparent outline-none font-semibold text-slate-600 text-xs" value={row.label} onChange={(e) => {
                         const next = rows.map(r => r.id === row.id ? {...r, label: e.target.value} : r);
                         setRows(next); save(locations, next);
@@ -195,7 +182,7 @@ export default function App() {
                     {locations.map(loc => (
                       <td key={loc.id} className="p-3 px-4 border-l border-slate-100">
                         <div className="flex items-center gap-1">
-                          <span className="text-slate-300 font-bold text-xs">{currency}</span>
+                          <span className="text-slate-300 font-bold text-xs">$</span>
                           <input type="number" className="w-full bg-transparent outline-none font-bold text-slate-800 text-sm"
                             value={row.costs[loc.id] === 0 ? 0 : row.costs[loc.id] || ''}
                             onFocus={(e) => e.target.select()}
@@ -207,11 +194,6 @@ export default function App() {
                         </div>
                       </td>
                     ))}
-                    <td className="p-3 border-l border-slate-100 text-center">
-                      <button onClick={() => deleteRow(row.id)} className="opacity-0 group-hover:opacity-100 text-slate-200 hover:text-red-500 transition-all">
-                        <IconTrash />
-                      </button>
-                    </td>
                   </tr>
                 ))}
                 <tr className="bg-slate-900 text-white font-bold">
@@ -219,11 +201,10 @@ export default function App() {
                   {locations.map(loc => (
                     <td key={loc.id} className="p-5 px-4 border-l border-slate-800">
                       <div className="text-xl font-black tracking-tighter">
-                        {currency}{rows.reduce((sum, r) => sum + (r.costs[loc.id] || 0), 0).toLocaleString()}
+                        ${rows.reduce((sum, r) => sum + (r.costs[loc.id] || 0), 0).toLocaleString()}
                       </div>
                     </td>
                   ))}
-                  <td className="p-5 border-l border-slate-800"></td>
                 </tr>
               </tbody>
             </table>

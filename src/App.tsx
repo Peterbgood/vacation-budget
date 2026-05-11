@@ -15,8 +15,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>;
-const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6"/></svg>;
+const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>;
+const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6"/></svg>;
+const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>;
 
 interface Row {
   id: string;
@@ -26,21 +27,20 @@ interface Row {
 
 export default function App() {
   const [locations, setLocations] = useState([
-    { id: 1, name: "Maui" }, { id: 2, name: "Tokyo" },
-    { id: 3, name: "Paris" }, { id: 4, name: "London" }
+    { id: 1, name: "Maui" }, { id: 2, name: "Tokyo" }
   ]);
 
   const [rows, setRows] = useState<Row[]>([
-    { id: '1', label: 'Flights', costs: { 1: 0, 2: 0, 3: 0, 4: 0 } },
-    { id: '2', label: 'Hotel', costs: { 1: 0, 2: 0, 3: 0, 4: 0 } }
+    { id: '1', label: 'Flights', costs: { 1: 0, 2: 0 } },
+    { id: '2', label: 'Hotel', costs: { 1: 0, 2: 0 } }
   ]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "budgets", "spreadsheet-data"), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        setLocations(data.locations);
-        setRows(data.rows);
+        setLocations(data.locations || []);
+        setRows(data.rows || []);
       }
     });
     return () => unsub();
@@ -48,6 +48,29 @@ export default function App() {
 
   const saveToFirebase = async (newLocs: any, newRows: any) => {
     await setDoc(doc(db, "budgets", "spreadsheet-data"), { locations: newLocs, rows: newRows });
+  };
+
+  const addLocation = () => {
+    if (locations.length >= 10) return; // Cap at 10
+    const newId = Date.now();
+    const newLocs = [...locations, { id: newId, name: "New City" }];
+    const newRows = rows.map(row => ({ ...row, costs: { ...row.costs, [newId]: 0 } }));
+    setLocations(newLocs);
+    setRows(newRows);
+    saveToFirebase(newLocs, newRows);
+  };
+
+  const deleteLocation = (locId: number) => {
+    if (locations.length <= 1) return;
+    const newLocs = locations.filter(l => l.id !== locId);
+    const newRows = rows.map(row => {
+      const updatedCosts = { ...row.costs };
+      delete updatedCosts[locId];
+      return { ...row, costs: updatedCosts };
+    });
+    setLocations(newLocs);
+    setRows(newRows);
+    saveToFirebase(newLocs, newRows);
   };
 
   const updateLocation = (id: number, val: string) => {
@@ -74,7 +97,9 @@ export default function App() {
   };
 
   const addRow = () => {
-    const next = [...rows, { id: crypto.randomUUID(), label: '', costs: { 1: 0, 2: 0, 3: 0, 4: 0 } }];
+    const newCosts: Record<number, number> = {};
+    locations.forEach(l => newCosts[l.id] = 0);
+    const next = [...rows, { id: crypto.randomUUID(), label: '', costs: newCosts }];
     setRows(next);
     saveToFirebase(locations, next);
   };
@@ -90,102 +115,86 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-12 text-slate-900">
-      <div className="max-w-[1400px] mx-auto">
-        <header className="mb-8 md:mb-12">
-          <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-2">Vacation Budget</h1>
-          <p className="text-slate-400 font-medium text-sm md:text-base">Compare destinations side-by-side.</p>
+    <div className="min-h-screen bg-slate-50 p-2 md:p-6 text-slate-900 overflow-x-hidden">
+      <div className="max-w-[1600px] mx-auto">
+        <header className="mb-4 flex flex-col md:flex-row md:items-center justify-between gap-2">
+          <div>
+            <h1 className="text-xl md:text-2xl font-black tracking-tight">Vacation Budget</h1>
+            <p className="text-slate-400 font-medium text-xs">Side-by-side comparison</p>
+          </div>
+          <button 
+            onClick={addLocation}
+            className="flex items-center justify-center gap-1 bg-blue-600 text-white font-bold text-xs px-4 py-2 rounded-xl hover:bg-blue-700 transition-all shadow-md"
+          >
+            <IconPlus /> Add Column
+          </button>
         </header>
 
-        {/* --- MOBILE VIEW (Stacks vertically, no horizontal scroll) --- */}
-        <div className="block md:hidden space-y-8">
+        {/* MOBILE VIEW */}
+        <div className="block md:hidden space-y-4">
           {locations.map(loc => (
-            <div key={loc.id} className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/50 border border-slate-100">
-              <input 
-                className="w-full bg-transparent font-black text-2xl mb-6 outline-none text-blue-600"
-                value={loc.name}
-                onChange={(e) => updateLocation(loc.id, e.target.value)}
-              />
-              <div className="space-y-4">
+            <div key={loc.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 relative">
+              <button onClick={() => deleteLocation(loc.id)} className="absolute top-3 right-3 text-slate-200"><IconTrash /></button>
+              <input className="w-full bg-transparent font-bold text-lg mb-4 outline-none text-blue-600" value={loc.name} onChange={(e) => updateLocation(loc.id, e.target.value)} />
+              <div className="space-y-2">
                 {rows.map(row => (
-                  <div key={row.id} className="flex items-center justify-between gap-2 border-b border-slate-50 pb-3">
-                    <div className="flex-1">
-                      <p className="text-[10px] font-black uppercase text-slate-300 tracking-widest">{row.label || 'Category'}</p>
-                      <div className="flex items-center text-lg font-bold">
-                        <span className="text-slate-300 mr-1">$</span>
-                        <input 
-                          type="number"
-                          className="w-full bg-transparent outline-none"
-                          value={row.costs[loc.id] || ''}
-                          onChange={(e) => updateCost(row.id, loc.id, e.target.value)}
-                        />
-                      </div>
+                  <div key={row.id} className="flex justify-between border-b border-slate-50 pb-1">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase">{row.label || 'Item'}</span>
+                    <div className="flex items-center text-sm font-bold">
+                      <span className="text-slate-300 mr-0.5">$</span>
+                      <input type="number" className="w-16 bg-transparent text-right outline-none" value={row.costs[loc.id] || ''} onChange={(e) => updateCost(row.id, loc.id, e.target.value)} />
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="mt-6 pt-6 border-t-2 border-dashed border-slate-100">
-                <p className="text-[10px] font-black uppercase text-slate-400">Estimated Total</p>
-                <p className="text-4xl font-black tracking-tighter">${getColTotal(loc.id).toLocaleString()}</p>
+              <div className="mt-3 pt-3 border-t border-dashed border-slate-100 text-right">
+                <p className="text-xl font-black tracking-tighter">${getColTotal(loc.id).toLocaleString()}</p>
               </div>
             </div>
           ))}
         </div>
 
-        {/* --- DESKTOP VIEW (Spreadsheet Table) --- */}
-        <div className="hidden md:block overflow-hidden shadow-2xl shadow-slate-200/50 rounded-3xl border border-slate-100 bg-white">
-          <table className="w-full border-collapse text-left">
+        {/* COMPACT DESKTOP VIEW */}
+        <div className="hidden md:block shadow-xl rounded-2xl border border-slate-100 bg-white">
+          <table className="w-full border-collapse text-left table-fixed">
             <thead>
-              <tr className="bg-slate-50/50">
-                <th className="p-6 border-b border-slate-100 w-64 text-[10px] font-black uppercase tracking-widest text-slate-400">Category</th>
+              <tr className="bg-slate-50/30">
+                <th className="p-3 border-b border-slate-100 w-40 text-[9px] font-black uppercase tracking-widest text-slate-400">Category</th>
                 {locations.map(loc => (
-                  <th key={loc.id} className="p-6 border-b border-slate-100 min-w-[150px]">
-                    <input 
-                      className="w-full bg-transparent font-bold text-xl outline-none focus:text-blue-600 transition-colors"
-                      value={loc.name}
-                      onChange={(e) => updateLocation(loc.id, e.target.value)}
-                    />
+                  <th key={loc.id} className="p-3 border-b border-slate-100 group relative">
+                    <div className="flex items-center justify-between gap-1">
+                      <input className="w-full bg-transparent font-bold text-xs outline-none focus:text-blue-600" value={loc.name} onChange={(e) => updateLocation(loc.id, e.target.value)} />
+                      <button onClick={() => deleteLocation(loc.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500"><IconX /></button>
+                    </div>
                   </th>
                 ))}
-                <th className="p-6 border-b border-slate-100 w-16"></th>
+                <th className="p-3 border-b border-slate-100 w-10"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {rows.map(row => (
-                <tr key={row.id} className="hover:bg-slate-50/30 transition-colors group">
-                  <td className="p-4 px-6">
-                    <input 
-                      placeholder="e.g. Flights"
-                      className="w-full bg-transparent outline-none font-medium text-slate-600"
-                      value={row.label}
-                      onChange={(e) => updateRowLabel(row.id, e.target.value)}
-                    />
+                <tr key={row.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="p-2 px-3">
+                    <input placeholder="Expense..." className="w-full bg-transparent outline-none font-medium text-slate-500 text-xs" value={row.label} onChange={(e) => updateRowLabel(row.id, e.target.value)} />
                   </td>
                   {locations.map(loc => (
-                    <td key={loc.id} className="p-4 px-6">
-                      <div className="relative flex items-center">
-                        <span className="absolute left-0 text-slate-300 font-bold">$</span>
-                        <input 
-                          type="number"
-                          className="w-full bg-transparent pl-4 outline-none font-bold text-slate-800"
-                          value={row.costs[loc.id] || ''}
-                          onChange={(e) => updateCost(row.id, loc.id, e.target.value)}
-                        />
+                    <td key={loc.id} className="p-2 px-3 border-l border-slate-50/50">
+                      <div className="flex items-center">
+                        <span className="text-slate-300 font-bold text-[10px]">$</span>
+                        <input type="number" className="w-full bg-transparent outline-none font-bold text-slate-800 text-sm" value={row.costs[loc.id] || ''} onChange={(e) => updateCost(row.id, loc.id, e.target.value)} />
                       </div>
                     </td>
                   ))}
-                  <td className="p-4 px-6 text-center">
-                    <button onClick={() => deleteRow(row.id)} className="text-slate-200 hover:text-red-500 opacity-0 group-hover:opacity-100">
-                      <IconTrash />
-                    </button>
+                  <td className="p-2 text-center">
+                    <button onClick={() => deleteRow(row.id)} className="text-slate-200 hover:text-red-500 opacity-0 group-hover:opacity-100"><IconTrash /></button>
                   </td>
                 </tr>
               ))}
               <tr className="bg-slate-900 text-white">
-                <td className="p-8 px-6 text-[10px] font-black uppercase tracking-[0.3em]">Total</td>
+                <td className="p-4 px-3 text-[9px] font-black uppercase tracking-widest">Total</td>
                 {locations.map(loc => (
-                  <td key={loc.id} className="p-8 px-6">
-                    <div className="text-3xl font-black tracking-tighter">${getColTotal(loc.id).toLocaleString()}</div>
+                  <td key={loc.id} className="p-4 px-3 border-l border-slate-800">
+                    <div className="text-base font-black tracking-tighter">${getColTotal(loc.id).toLocaleString()}</div>
                   </td>
                 ))}
                 <td></td>
@@ -196,9 +205,9 @@ export default function App() {
 
         <button 
           onClick={addRow}
-          className="mt-8 flex items-center justify-center gap-2 bg-white md:bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-600 font-bold px-8 py-4 rounded-2xl transition-all w-full md:w-auto shadow-lg md:shadow-none"
+          className="mt-4 flex items-center justify-center gap-1 bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-500 font-bold text-xs px-6 py-2.5 rounded-xl transition-all w-full md:w-auto"
         >
-          <IconPlus /> Add Row Item
+          <IconPlus /> Add Row
         </button>
       </div>
     </div>

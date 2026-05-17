@@ -34,6 +34,9 @@ export default function App() {
     { id: '1', label: 'Flights', costs: { 1: 0, 2: 0 } },
     { id: '2', label: 'Hotel', costs: { 1: 0, 2: 0 } }
   ]);
+  
+  // Tracks which row ID is currently awaiting a delete confirmation
+  const [deletingRowId, setDeletingRowId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "budgets", "spreadsheet-data"), (snapshot) => {
@@ -75,15 +78,14 @@ export default function App() {
   const deleteRow = (id: string) => {
     const r = rows.filter(row => row.id !== id);
     setRows(r); save(locations, r);
+    setDeletingRowId(null); // Reset confirmation state
   };
 
-  // --- Reorder Logic ---
   const moveRow = (index: number, direction: 'up' | 'down') => {
     const nextIndex = direction === 'up' ? index - 1 : index + 1;
-    if (nextIndex < 0 || nextIndex >= rows.length) return; // Boundary check
+    if (nextIndex < 0 || nextIndex >= rows.length) return;
 
     const updatedRows = [...rows];
-    // Swap positions
     const temp = updatedRows[index];
     updatedRows[index] = updatedRows[nextIndex];
     updatedRows[nextIndex] = temp;
@@ -122,29 +124,40 @@ export default function App() {
               />
               <div className="space-y-3">
                 {rows.map((row, rIdx) => (
-                  <div key={row.id} className="flex items-center justify-between gap-4 border-b border-slate-50 pb-2 group">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <div className="flex flex-col shrink-0">
-                          <button disabled={rIdx === 0} onClick={() => moveRow(rIdx, 'up')} className="text-slate-300 hover:text-blue-500 disabled:opacity-20"><IconUp /></button>
-                          <button disabled={rIdx === rows.length - 1} onClick={() => moveRow(rIdx, 'down')} className="text-slate-300 hover:text-blue-500 disabled:opacity-20"><IconDown /></button>
-                        </div>
-                        <input 
-                          className="flex-1 bg-transparent text-[10px] font-black uppercase text-slate-400 outline-none"
-                          value={row.label}
-                          placeholder="Item..."
-                          onChange={(e) => {
-                            const next = rows.map(r => r.id === row.id ? {...r, label: e.target.value} : r);
-                            setRows(next); save(locations, next);
-                          }}
-                        />
-                        <button onClick={() => deleteRow(row.id)} className="text-slate-200 hover:text-red-500"><IconTrash /></button>
+                  <div key={row.id} className="flex flex-col border-b border-slate-50 pb-3 gap-2">
+                    {/* Header line for Mobile Item containing separate Reorder and Delete zones */}
+                    <div className="flex items-center justify-between bg-slate-50/50 p-1.5 rounded-lg">
+                      <div className="flex items-center gap-1">
+                        <button disabled={rIdx === 0} onClick={() => moveRow(rIdx, 'up')} className="text-slate-400 hover:text-blue-500 p-1 disabled:opacity-20"><IconUp /></button>
+                        <button disabled={rIdx === rows.length - 1} onClick={() => moveRow(rIdx, 'down')} className="text-slate-400 hover:text-blue-500 p-1 disabled:opacity-20"><IconDown /></button>
                       </div>
-                      <div className="flex items-center font-bold text-lg mt-1">
+                      
+                      {/* In-line Delete Confirmation for Mobile */}
+                      {deletingRowId === row.id ? (
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => deleteRow(row.id)} className="bg-red-500 text-white text-[10px] font-bold uppercase px-2 py-1 rounded">Confirm</button>
+                          <button onClick={() => setDeletingRowId(null)} className="text-slate-400 text-[10px] font-bold uppercase px-1">Cancel</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setDeletingRowId(row.id)} className="text-slate-300 hover:text-red-500 p-1"><IconTrash /></button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center font-bold text-lg">
+                      <input 
+                        className="flex-1 bg-transparent text-[10px] font-black uppercase text-slate-400 outline-none"
+                        value={row.label}
+                        placeholder="Item..."
+                        onChange={(e) => {
+                          const next = rows.map(r => r.id === row.id ? {...r, label: e.target.value} : r);
+                          setRows(next); save(locations, next);
+                        }}
+                      />
+                      <div className="flex items-center ml-2">
                         <span className="text-slate-300 mr-1 text-sm">$</span>
                         <input 
                           type="number" 
-                          className="w-full bg-transparent outline-none"
+                          className="w-24 bg-transparent outline-none text-right font-bold text-slate-800"
                           value={row.costs[loc.id] === 0 ? 0 : row.costs[loc.id] || ''}
                           onFocus={(e) => e.target.select()}
                           onChange={(e) => {
@@ -171,10 +184,11 @@ export default function App() {
         {/* --- DESKTOP SPREADSHEET VIEW --- */}
         <div className="hidden md:block bg-white rounded-xl shadow-xl shadow-slate-200/60 border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left table-fixed min-w-[800px]">
+            <table className="w-full border-collapse text-left table-fixed min-w-[900px]">
               <thead>
                 <tr className="bg-slate-50">
-                  <th className="w-64 p-4 border-b border-slate-200 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Expense Category</th>
+                  {/* Left column expanded slightly to safely separate controls */}
+                  <th className="w-72 p-4 border-b border-slate-200 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Expense Category</th>
                   {locations.map(loc => (
                     <th key={loc.id} className="p-4 border-b border-l border-slate-200 group relative">
                       <div className="flex items-center justify-between">
@@ -191,24 +205,42 @@ export default function App() {
               <tbody className="divide-y divide-slate-100">
                 {rows.map((row, rIdx) => (
                   <tr key={row.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="p-3 px-4 bg-slate-50/30 flex items-center gap-2">
-                      <div className="flex items-center opacity-0 group-hover:opacity-100 transition-all gap-1 shrink-0">
-                        <button onClick={() => deleteRow(row.id)} className="text-slate-300 hover:text-red-500">
-                          <IconTrash />
+                    <td className="p-3 px-4 bg-slate-50/30 flex items-center justify-between gap-2">
+                      
+                      {/* Left Side: Reorder Buttons (Always accessible or on-hover) */}
+                      <div className="flex items-center gap-0.5 shrink-0 bg-slate-100/60 p-1 rounded-md">
+                        <button disabled={rIdx === 0} onClick={() => moveRow(rIdx, 'up')} className="text-slate-400 hover:text-blue-600 disabled:opacity-20 transition-colors">
+                          <IconUp />
                         </button>
-                        <div className="flex flex-col">
-                          <button disabled={rIdx === 0} onClick={() => moveRow(rIdx, 'up')} className="text-slate-300 hover:text-blue-500 disabled:opacity-20">
-                            <IconUp />
-                          </button>
-                          <button disabled={rIdx === rows.length - 1} onClick={() => moveRow(rIdx, 'down')} className="text-slate-300 hover:text-blue-500 disabled:opacity-20">
-                            <IconDown />
-                          </button>
-                        </div>
+                        <button disabled={rIdx === rows.length - 1} onClick={() => moveRow(rIdx, 'down')} className="text-slate-400 hover:text-blue-600 disabled:opacity-20 transition-colors">
+                          <IconDown />
+                        </button>
                       </div>
-                      <input placeholder="Item..." className="w-full bg-transparent outline-none font-semibold text-slate-600 text-xs" value={row.label} onChange={(e) => {
+
+                      {/* Middle: Text Input */}
+                      <input placeholder="Item..." className="w-full bg-transparent outline-none font-semibold text-slate-600 text-xs px-2" value={row.label} onChange={(e) => {
                         const next = rows.map(r => r.id === row.id ? {...r, label: e.target.value} : r);
                         setRows(next); save(locations, next);
                       }} />
+
+                      {/* Right Side: Non-popup Confirm Delete */}
+                      <div className="shrink-0 flex items-center min-w-[24px]">
+                        {deletingRowId === row.id ? (
+                          <div className="flex items-center gap-1.5 animation-fadeIn">
+                            <button onClick={() => deleteRow(row.id)} className="bg-red-500 hover:bg-red-600 text-[9px] text-white font-extrabold uppercase px-1.5 py-1 rounded shadow-sm">
+                              Delete
+                            </button>
+                            <button onClick={() => setDeletingRowId(null)} className="text-[9px] text-slate-400 font-bold hover:text-slate-600 uppercase px-0.5">
+                              X
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setDeletingRowId(row.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all p-1">
+                            <IconTrash />
+                          </button>
+                        )}
+                      </div>
+                      
                     </td>
                     {locations.map(loc => (
                       <td key={loc.id} className="p-3 px-4 border-l border-slate-100">

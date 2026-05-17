@@ -19,6 +19,8 @@ const db = getFirestore(app);
 const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>;
 const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6"/></svg>;
 const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>;
+const IconUp = () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>;
+const IconDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>;
 
 interface Row {
   id: string;
@@ -75,6 +77,21 @@ export default function App() {
     setRows(r); save(locations, r);
   };
 
+  // --- Reorder Logic ---
+  const moveRow = (index: number, direction: 'up' | 'down') => {
+    const nextIndex = direction === 'up' ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= rows.length) return; // Boundary check
+
+    const updatedRows = [...rows];
+    // Swap positions
+    const temp = updatedRows[index];
+    updatedRows[index] = updatedRows[nextIndex];
+    updatedRows[nextIndex] = temp;
+
+    setRows(updatedRows);
+    save(locations, updatedRows);
+  };
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-[1400px] mx-auto">
@@ -104,10 +121,14 @@ export default function App() {
                 }} 
               />
               <div className="space-y-3">
-                {rows.map(row => (
+                {rows.map((row, rIdx) => (
                   <div key={row.id} className="flex items-center justify-between gap-4 border-b border-slate-50 pb-2 group">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
+                        <div className="flex flex-col shrink-0">
+                          <button disabled={rIdx === 0} onClick={() => moveRow(rIdx, 'up')} className="text-slate-300 hover:text-blue-500 disabled:opacity-20"><IconUp /></button>
+                          <button disabled={rIdx === rows.length - 1} onClick={() => moveRow(rIdx, 'down')} className="text-slate-300 hover:text-blue-500 disabled:opacity-20"><IconDown /></button>
+                        </div>
                         <input 
                           className="flex-1 bg-transparent text-[10px] font-black uppercase text-slate-400 outline-none"
                           value={row.label}
@@ -153,7 +174,7 @@ export default function App() {
             <table className="w-full border-collapse text-left table-fixed min-w-[800px]">
               <thead>
                 <tr className="bg-slate-50">
-                  <th className="w-56 p-4 border-b border-slate-200 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Expense Category</th>
+                  <th className="w-64 p-4 border-b border-slate-200 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Expense Category</th>
                   {locations.map(loc => (
                     <th key={loc.id} className="p-4 border-b border-l border-slate-200 group relative">
                       <div className="flex items-center justify-between">
@@ -168,12 +189,22 @@ export default function App() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {rows.map(row => (
+                {rows.map((row, rIdx) => (
                   <tr key={row.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="p-3 px-4 bg-slate-50/30 flex items-center gap-2">
-                      <button onClick={() => deleteRow(row.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all shrink-0">
-                        <IconTrash />
-                      </button>
+                      <div className="flex items-center opacity-0 group-hover:opacity-100 transition-all gap-1 shrink-0">
+                        <button onClick={() => deleteRow(row.id)} className="text-slate-300 hover:text-red-500">
+                          <IconTrash />
+                        </button>
+                        <div className="flex flex-col">
+                          <button disabled={rIdx === 0} onClick={() => moveRow(rIdx, 'up')} className="text-slate-300 hover:text-blue-500 disabled:opacity-20">
+                            <IconUp />
+                          </button>
+                          <button disabled={rIdx === rows.length - 1} onClick={() => moveRow(rIdx, 'down')} className="text-slate-300 hover:text-blue-500 disabled:opacity-20">
+                            <IconDown />
+                          </button>
+                        </div>
+                      </div>
                       <input placeholder="Item..." className="w-full bg-transparent outline-none font-semibold text-slate-600 text-xs" value={row.label} onChange={(e) => {
                         const next = rows.map(r => r.id === row.id ? {...r, label: e.target.value} : r);
                         setRows(next); save(locations, next);

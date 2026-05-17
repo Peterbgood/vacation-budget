@@ -34,6 +34,8 @@ export default function App() {
     { id: '1', label: 'Flights', costs: { 1: 0, 2: 0 } },
     { id: '2', label: 'Hotel', costs: { 1: 0, 2: 0 } }
   ]);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   
   // Tracks which row ID is currently awaiting a delete confirmation
   const [deletingRowId, setDeletingRowId] = useState<string | null>(null);
@@ -44,12 +46,51 @@ export default function App() {
         const data = snapshot.data();
         setLocations(data.locations || []);
         setRows(data.rows || []);
+        setStartDate(data.startDate || '');
+        setEndDate(data.endDate || '');
       }
     });
     return () => unsub();
   }, []);
 
-  const save = (l: any, r: any) => setDoc(doc(db, "budgets", "spreadsheet-data"), { locations: l, rows: r });
+  const save = (l: any, r: any, start = startDate, end = endDate) => {
+    setDoc(doc(db, "budgets", "spreadsheet-data"), { 
+      locations: l, 
+      rows: r,
+      startDate: start,
+      endDate: end
+    });
+  };
+
+  // --- Date Math Calculations ---
+  const calculateNights = () => {
+    if (!startDate || !endDate) return null;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+
+  const calculateDaysUntil = () => {
+    if (!startDate) return null;
+    
+    // Create dates strictly set to local midnight to prevent time-of-day offsets
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const start = new Date(startDate + 'T00:00:00'); 
+    
+    const diffTime = start.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return "Today!";
+    if (diffDays < 0) return "Passed";
+    return `${diffDays} days left`;
+  };
+
+  const nights = calculateNights();
+  const daysUntil = calculateDaysUntil();
 
   const addCol = () => {
     const id = Date.now();
@@ -98,18 +139,67 @@ export default function App() {
     <div className="min-h-screen bg-[#F8FAFC] p-3 md:p-5 font-sans text-slate-900">
       <div className="max-w-[1400px] mx-auto">
         
-        {/* --- COMPACT HEADER WITH BOTH ACTIONS --- */}
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 pb-2 border-b border-slate-200 gap-2 sm:gap-4">
-          <div className="flex items-baseline gap-2">
-            <h1 className="text-lg font-black tracking-tight text-slate-800">Vacation Planner Pro</h1>
-            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 italic">Cloud Sync</p>
+        {/* --- COMPACT HEADER WITH DATE METRICS --- */}
+        <header className="flex flex-col lg:flex-row lg:items-center justify-between mb-3 pb-2 border-b border-slate-200 gap-2 lg:gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 lg:gap-4 flex-wrap">
+            <div className="flex items-baseline gap-2">
+              <h1 className="text-lg font-black tracking-tight text-slate-800">Vacation Planner Pro</h1>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 italic">Cloud Sync</p>
+            </div>
+            
+            {/* --- DATE PICKERS & CALCULATED METRICS --- */}
+            <div className="flex items-center gap-2 text-slate-500 flex-wrap">
+              <div className="flex items-center bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">
+                <span className="text-[10px] font-bold uppercase text-slate-400 mr-1.5">Start:</span>
+                <input 
+                  type="date" 
+                  className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer [color-scheme:light]"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    save(locations, rows, e.target.value, endDate);
+                  }}
+                />
+              </div>
+              
+              <span className="text-xs font-bold text-slate-300">to</span>
+              
+              <div className="flex items-center bg-white px-2 py-1 rounded border border-slate-200 shadow-sm">
+                <span className="text-[10px] font-bold uppercase text-slate-400 mr-1.5">End:</span>
+                <input 
+                  type="date" 
+                  className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer [color-scheme:light]"
+                  value={endDate}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    save(locations, rows, startDate, e.target.value);
+                  }}
+                />
+              </div>
+
+              {/* Dynamic Vacation Badges */}
+              {(nights !== null || daysUntil !== null) && (
+                <div className="flex items-center gap-1.5 ml-1">
+                  {nights !== null && (
+                    <span className="bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shadow-sm">
+                      {nights} {nights === 1 ? 'Night' : 'Nights'}
+                    </span>
+                  )}
+                  {daysUntil !== null && (
+                    <span className="bg-emerald-50 text-emerald-600 border border-emerald-100 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider shadow-sm">
+                      {daysUntil}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           
-          <div className="flex items-center gap-2">
-            <button onClick={addRow} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all border border-slate-200">
+          <div className="flex items-center gap-2 w-full lg:w-auto">
+            <button onClick={addRow} className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all border border-slate-200">
               <IconPlus /> Add Row Item
             </button>
-            <button onClick={addCol} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-md text-[11px] font-bold hover:bg-blue-700 shadow-sm transition-all">
+            <button onClick={addCol} className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded-md text-[11px] font-bold hover:bg-blue-700 shadow-sm transition-all">
               <IconPlus /> Add Destination
             </button>
           </div>
@@ -131,17 +221,12 @@ export default function App() {
               <div className="space-y-2">
                 {rows.map((row, rIdx) => (
                   <div key={row.id} className="border-b border-slate-50 pb-2 group">
-                    
-                    {/* Cleaned layout: Reorder, label input, delete, and numeric values all cleanly inline */}
                     <div className="flex items-center justify-between font-bold text-base gap-2">
-                      
-                      {/* Left: Reorder tools (visible on block hover) */}
                       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 shrink-0 bg-slate-50 p-0.5 rounded">
                         <button disabled={rIdx === 0} onClick={() => moveRow(rIdx, 'up')} className="text-slate-400 hover:text-blue-500 p-0.5 disabled:opacity-20"><IconUp /></button>
                         <button disabled={rIdx === rows.length - 1} onClick={() => moveRow(rIdx, 'down')} className="text-slate-400 hover:text-blue-500 p-0.5 disabled:opacity-20"><IconDown /></button>
                       </div>
 
-                      {/* Middle-Left: Label Input */}
                       <input 
                         className="flex-1 min-w-0 bg-transparent text-[11px] font-black uppercase text-slate-400 outline-none placeholder-slate-300"
                         value={row.label}
@@ -152,7 +237,6 @@ export default function App() {
                         }}
                       />
 
-                      {/* Middle-Right: Clean Inline Delete / Confirmation Flow */}
                       <div className="shrink-0 flex items-center min-w-[20px] justify-center">
                         {deletingRowId === row.id ? (
                           <div className="flex items-center gap-1 bg-red-50 p-0.5 rounded border border-red-100">
@@ -164,7 +248,6 @@ export default function App() {
                         )}
                       </div>
 
-                      {/* Right: Currency Input Area */}
                       <div className="flex items-center shrink-0 ml-1 bg-slate-50/50 px-1.5 py-0.5 rounded border border-slate-100">
                         <span className="text-slate-300 mr-0.5 text-xs">$</span>
                         <input 
@@ -179,7 +262,6 @@ export default function App() {
                           }} 
                         />
                       </div>
-
                     </div>
                   </div>
                 ))}
@@ -218,7 +300,6 @@ export default function App() {
                 {rows.map((row, rIdx) => (
                   <tr key={row.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="p-2 px-3 bg-slate-50/30 flex items-center justify-between gap-2">
-                      
                       <div className="flex items-center gap-0.5 shrink-0 bg-slate-100/60 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                         <button disabled={rIdx === 0} onClick={() => moveRow(rIdx, 'up')} className="text-slate-400 hover:text-blue-600 disabled:opacity-20 transition-colors">
                           <IconUp />
@@ -249,7 +330,6 @@ export default function App() {
                           </button>
                         )}
                       </div>
-                      
                     </td>
                     {locations.map(loc => (
                       <td key={loc.id} className="p-2 px-3 border-l border-slate-100">
